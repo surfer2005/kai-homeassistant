@@ -38,7 +38,7 @@
           "tracker_entity": "Tracker (coordinates/speed in attributes)",
           "latitude_entity": "Latitude sensor (optional)",
           "longitude_entity": "Longitude sensor (optional)",
-          "speed_entity": "Speed sensor in knots (optional)",
+          "speed_entity": "Speed sensor (optional, unit auto-detected → knots)",
           "heading_entity": "Heading sensor in degrees (optional)",
           "power_entities": "Smart-meter sensors (optional)"
         }

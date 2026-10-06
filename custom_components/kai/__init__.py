@@ -42,6 +42,25 @@ def _num(value):
         return None
 
 
+# Geschwindigkeit nach Knoten umrechnen — KAI speichert speed_kn. Einheit kommt aus dem Sensor
+# (unit_of_measurement); unbekannt/leer → unverändert übernehmen.
+_TO_KN = {
+    "km/h": 1 / 1.852, "kmh": 1 / 1.852, "kph": 1 / 1.852,
+    "mph": 1 / 1.150779,
+    "m/s": 1.943844, "ms": 1.943844,
+    "kn": 1.0, "kt": 1.0, "kts": 1.0, "knot": 1.0, "knots": 1.0,
+}
+
+
+def _to_knots(val, unit):
+    if val is None:
+        return None
+    if not unit:
+        return val
+    factor = _TO_KN.get(str(unit).strip().lower())
+    return round(val * factor, 2) if factor else val
+
+
 class KaiSender:
     """Liest konfigurierte HA-Entities und postet sie zyklisch an KAI."""
 
@@ -81,7 +100,8 @@ class KaiSender:
             elif setter == "lon":
                 lon = val
             elif setter == "speed":
-                speed = val
+                # Einheit des Sensors beachten (z. B. Teltonika liefert km/h) → nach Knoten.
+                speed = _to_knots(val, st.attributes.get("unit_of_measurement"))
             elif setter == "heading":
                 heading = val
         if lat is None and lon is None and speed is None and heading is None:

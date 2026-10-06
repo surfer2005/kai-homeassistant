@@ -38,7 +38,7 @@
           "tracker_entity": "Tracker (Koordinaten/Geschwindigkeit in Attributen)",
           "latitude_entity": "Sensor Breitengrad (optional)",
           "longitude_entity": "Sensor Längengrad (optional)",
-          "speed_entity": "Sensor Geschwindigkeit in Knoten (optional)",
+          "speed_entity": "Sensor Geschwindigkeit (optional, Einheit wird erkannt → Knoten)",
           "heading_entity": "Sensor Kurs in Grad (optional)",
           "power_entities": "Smartmeter-Sensoren (optional)"
         }
