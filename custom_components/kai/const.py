@@ -19,7 +19,9 @@ CONF_LAT = "latitude_entity"            # alternativ: eigener Sensor
 CONF_LON = "longitude_entity"
 CONF_SPEED = "speed_entity"
 CONF_HEADING = "heading_entity"
-CONF_POWER = "power_entities"           # Liste: Smartmeter-Sensoren → /api/landstrom/ingest
+CONF_POWER = "power_entities"           # Liste: einzelne Smartmeter-Sensoren → /api/landstrom/ingest
+CONF_POWER_LABELS = "power_labels"      # HA-Labels: ALLE Sensoren mit diesem Label
+CONF_POWER_AREAS = "power_areas"        # HA-Bereiche: ALLE Sensoren in diesem Bereich
 
 DEFAULT_SCAN_INTERVAL = 10             # Sekunden (Position/Geschwindigkeit)
 DEFAULT_SMARTMETER_INTERVAL = 60       # Sekunden (Smartmeter, langsamer)

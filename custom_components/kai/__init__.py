@@ -8,6 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
@@ -18,6 +19,8 @@ from .const import (
     CONF_LAT,
     CONF_LON,
     CONF_POWER,
+    CONF_POWER_AREAS,
+    CONF_POWER_LABELS,
     CONF_REGISTRATION,
     CONF_SCAN_INTERVAL,
     CONF_SHIPS,
@@ -143,10 +146,37 @@ class KaiSender:
             "recorded_at": dt_util.utcnow().isoformat(),
         }
 
+    def _smartmeter_entities(self, ship: dict) -> set[str]:
+        """Smartmeter-Sensoren eines Schiffs: einzeln gewählte + alle mit Label/Bereich."""
+        ids: set[str] = set(ship.get(CONF_POWER, []) or [])
+        labels = set(ship.get(CONF_POWER_LABELS, []) or [])
+        areas = set(ship.get(CONF_POWER_AREAS, []) or [])
+        if labels or areas:
+            ent_reg = er.async_get(self.hass)
+            dev_reg = dr.async_get(self.hass)
+            for e in ent_reg.entities.values():
+                if e.domain != "sensor" or e.disabled:
+                    continue
+                if labels and (set(e.labels) & labels):
+                    ids.add(e.entity_id)
+                    continue
+                if areas:
+                    area = e.area_id
+                    if area is None and e.device_id:
+                        dev = dev_reg.async_get(e.device_id)
+                        area = dev.area_id if dev else None
+                    if area in areas:
+                        ids.add(e.entity_id)
+        return ids
+
     def _readings(self) -> list[dict]:
         out: list[dict] = []
+        gesehen: set[str] = set()
         for ship in self._ships():
-            for ent in ship.get(CONF_POWER, []) or []:
+            for ent in sorted(self._smartmeter_entities(ship)):
+                if ent in gesehen:
+                    continue
+                gesehen.add(ent)
                 st = self.hass.states.get(ent)
                 val = _num(st.state) if st else None
                 if val is None:

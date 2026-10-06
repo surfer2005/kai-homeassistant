@@ -41,7 +41,9 @@
           "longitude_entity": "Sensor Längengrad (optional)",
           "speed_entity": "Sensor Geschwindigkeit (optional, Einheit wird erkannt → Knoten)",
           "heading_entity": "Sensor Kurs in Grad (optional)",
-          "power_entities": "Smartmeter-Sensoren (optional)"
+          "power_entities": "Smartmeter einzelne Sensoren (optional)",
+          "power_labels": "Smartmeter per Label (alle Sensoren mit diesem Label)",
+          "power_areas": "Smartmeter per Bereich (alle Sensoren im Bereich)"
         }
       },
       "remove_ship": {
