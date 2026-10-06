@@ -21,11 +21,13 @@ from .const import (
     CONF_REGISTRATION,
     CONF_SCAN_INTERVAL,
     CONF_SHIPS,
+    CONF_SMARTMETER_INTERVAL,
     CONF_SMARTMETER_KEY,
     CONF_SPEED,
     CONF_TRACKER,
     CONF_URL,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_SMARTMETER_INTERVAL,
     DOMAIN,
 )
 
@@ -61,6 +63,24 @@ def _to_knots(val, unit):
     return round(val * factor, 2) if factor else val
 
 
+# km/h parallel — KAI speichert beides (speed_kn + speed_kmh).
+_TO_KMH = {
+    "km/h": 1.0, "kmh": 1.0, "kph": 1.0,
+    "mph": 1.609344,
+    "m/s": 3.6, "ms": 3.6,
+    "kn": 1.852, "kt": 1.852, "kts": 1.852, "knot": 1.852, "knots": 1.852,
+}
+
+
+def _to_kmh(val, unit):
+    if val is None:
+        return None
+    if not unit:
+        return round(val * 1.852, 2)  # ohne Einheit: Attribut-Speed gilt als Knoten
+    factor = _TO_KMH.get(str(unit).strip().lower())
+    return round(val * factor, 2) if factor else val
+
+
 class KaiSender:
     """Liest konfigurierte HA-Entities und postet sie zyklisch an KAI."""
 
@@ -76,14 +96,18 @@ class KaiSender:
         reg = (ship.get(CONF_REGISTRATION) or "").strip()
         if not reg:
             return None
-        lat = lon = speed = heading = None
+        lat = lon = speed = speed_kmh = heading = None
         tracker = ship.get(CONF_TRACKER)
         if tracker:
             st = self.hass.states.get(tracker)
             if st and st.state not in _UNUSABLE:
                 lat = _num(st.attributes.get("latitude"))
                 lon = _num(st.attributes.get("longitude"))
-                speed = _num(st.attributes.get("speed"))
+                sp = _num(st.attributes.get("speed"))
+                if sp is not None:
+                    unit = st.attributes.get("speed_unit") or st.attributes.get("unit_of_measurement")
+                    speed = _to_knots(sp, unit)
+                    speed_kmh = _to_kmh(sp, unit)
         # Einzelne Sensoren übersteuern den Tracker, wenn gesetzt.
         for key, setter in (
             (CONF_LAT, "lat"), (CONF_LON, "lon"), (CONF_SPEED, "speed"), (CONF_HEADING, "heading"),
@@ -100,17 +124,20 @@ class KaiSender:
             elif setter == "lon":
                 lon = val
             elif setter == "speed":
-                # Einheit des Sensors beachten (z. B. Teltonika liefert km/h) → nach Knoten.
-                speed = _to_knots(val, st.attributes.get("unit_of_measurement"))
+                # Einheit des Sensors beachten (z. B. Teltonika liefert km/h) → beide Einheiten.
+                unit = st.attributes.get("unit_of_measurement")
+                speed = _to_knots(val, unit)
+                speed_kmh = _to_kmh(val, unit)
             elif setter == "heading":
                 heading = val
-        if lat is None and lon is None and speed is None and heading is None:
+        if lat is None and lon is None and speed is None and speed_kmh is None and heading is None:
             return None
         return {
             "registration_number": reg,
             "latitude": lat,
             "longitude": lon,
             "speed_kn": speed,
+            "speed_kmh": speed_kmh,
             "heading_deg": heading,
             "source": "homeassistant",
             "recorded_at": dt_util.utcnow().isoformat(),
@@ -141,18 +168,23 @@ class KaiSender:
                 out.append(pos)
         return out
 
-    async def async_update(self, _now=None) -> None:
+    async def async_update_positions(self, _now=None) -> None:
         positions = self._collect_positions()
-        readings = self._readings()
-        if not positions and not readings:
+        if not positions:
             return
         try:
-            if positions:
-                await self.client.send_positions(positions)
-            if readings:
-                await self.client.send_smartmeter(readings)
+            await self.client.send_positions(positions)
         except KaiApiError as err:
-            _LOGGER.warning("KAI-Übertragung fehlgeschlagen: %s", err)
+            _LOGGER.warning("KAI-Positionsübertragung fehlgeschlagen: %s", err)
+
+    async def async_update_smartmeter(self, _now=None) -> None:
+        readings = self._readings()
+        if not readings:
+            return
+        try:
+            await self.client.send_smartmeter(readings)
+        except KaiApiError as err:
+            _LOGGER.warning("KAI-Smartmeterübertragung fehlgeschlagen: %s", err)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -164,15 +196,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.data.get(CONF_SMARTMETER_KEY) or None,
     )
     sender = KaiSender(hass, client, entry)
-    interval = max(10, int(entry.options.get(CONF_SCAN_INTERVAL,
-                   entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))))
-    unsub = async_track_time_interval(hass, sender.async_update, timedelta(seconds=interval))
+    pos_interval = max(1, int(entry.options.get(CONF_SCAN_INTERVAL,
+                       entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))))
+    sm_interval = max(1, int(entry.options.get(CONF_SMARTMETER_INTERVAL, DEFAULT_SMARTMETER_INTERVAL)))
+    unsubs = [
+        async_track_time_interval(hass, sender.async_update_positions, timedelta(seconds=pos_interval)),
+        async_track_time_interval(hass, sender.async_update_smartmeter, timedelta(seconds=sm_interval)),
+    ]
 
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {"sender": sender, "unsub": unsub}
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {"sender": sender, "unsubs": unsubs}
     entry.async_on_unload(entry.add_update_listener(_async_reload))
 
     # Sofort einmal senden, nicht erst nach dem ersten Intervall.
-    hass.async_create_task(sender.async_update())
+    hass.async_create_task(sender.async_update_positions())
+    hass.async_create_task(sender.async_update_smartmeter())
     return True
 
 
@@ -182,6 +219,7 @@ async def _async_reload(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     data = hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
-    if data and data.get("unsub"):
-        data["unsub"]()
+    if data:
+        for unsub in data.get("unsubs", []):
+            unsub()
     return True

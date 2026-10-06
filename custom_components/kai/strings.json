@@ -8,7 +8,8 @@
           "url": "KAI-Adresse (z. B. https://kai-bsb.de)",
           "api_key": "Telemetrie Ingest-Key",
           "smartmeter_key": "Smartmeter Ingest-Key (optional)",
-          "scan_interval": "Sende-Intervall (Sekunden)"
+          "scan_interval": "Sende-Intervall Position/Geschwindigkeit (Sekunden)",
+          "smartmeter_scan_interval": "Sende-Intervall Smartmeter (Sekunden)"
         }
       }
     },
@@ -45,11 +46,16 @@
       },
       "remove_ship": {
         "title": "Schiff entfernen",
-        "data": { "remove": "Zu entfernende Schiffe" }
+        "data": {
+          "remove": "Zu entfernende Schiffe"
+        }
       },
       "interval": {
         "title": "Sende-Intervall",
-        "data": { "scan_interval": "Sende-Intervall (Sekunden)" }
+        "data": {
+          "scan_interval": "Position/Geschwindigkeit (Sekunden)",
+          "smartmeter_scan_interval": "Smartmeter (Sekunden)"
+        }
       }
     }
   }

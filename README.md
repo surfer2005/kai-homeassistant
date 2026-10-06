@@ -1,3 +1,5 @@
+<p align="center"><img src="icon.png" alt="KAI" width="96" height="96"></p>
+
 # KAI Flottenbetrieb — Home-Assistant-Integration
 
 Schickt Daten aus Home Assistant an **KAI**: je Schiff **Position, Geschwindigkeit, Kurs**

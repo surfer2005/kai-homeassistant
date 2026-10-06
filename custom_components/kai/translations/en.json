@@ -8,7 +8,8 @@
           "url": "KAI address (e.g. https://kai-bsb.de)",
           "api_key": "Telemetry ingest key",
           "smartmeter_key": "Smart-meter ingest key (optional)",
-          "scan_interval": "Send interval (seconds)"
+          "scan_interval": "Send interval position/speed (seconds)",
+          "smartmeter_scan_interval": "Send interval smart meter (seconds)"
         }
       }
     },
@@ -43,8 +44,19 @@
           "power_entities": "Smart-meter sensors (optional)"
         }
       },
-      "remove_ship": { "title": "Remove ship", "data": { "remove": "Ships to remove" } },
-      "interval": { "title": "Send interval", "data": { "scan_interval": "Send interval (seconds)" } }
+      "remove_ship": {
+        "title": "Remove ship",
+        "data": {
+          "remove": "Ships to remove"
+        }
+      },
+      "interval": {
+        "title": "Send interval",
+        "data": {
+          "scan_interval": "Position/speed (seconds)",
+          "smartmeter_scan_interval": "Smart meter (seconds)"
+        }
+      }
     }
   }
 }

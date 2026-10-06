@@ -25,11 +25,13 @@ from .const import (
     CONF_REGISTRATION,
     CONF_SCAN_INTERVAL,
     CONF_SHIPS,
+    CONF_SMARTMETER_INTERVAL,
     CONF_SMARTMETER_KEY,
     CONF_SPEED,
     CONF_TRACKER,
     CONF_URL,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_SMARTMETER_INTERVAL,
     DOMAIN,
     MIN_SCAN_INTERVAL,
 )
@@ -40,6 +42,10 @@ CONNECTION_SCHEMA = vol.Schema({
     vol.Optional(CONF_SMARTMETER_KEY, default=""): selector.TextSelector(),
     vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): selector.NumberSelector(
         selector.NumberSelectorConfig(min=MIN_SCAN_INTERVAL, max=3600, unit_of_measurement="s",
+                                      mode=selector.NumberSelectorMode.BOX)
+    ),
+    vol.Optional(CONF_SMARTMETER_INTERVAL, default=DEFAULT_SMARTMETER_INTERVAL): selector.NumberSelector(
+        selector.NumberSelectorConfig(min=MIN_SCAN_INTERVAL, max=86400, unit_of_measurement="s",
                                       mode=selector.NumberSelectorMode.BOX)
     ),
 })
@@ -104,6 +110,7 @@ class KaiConfigFlow(ConfigFlow, domain=DOMAIN):
                     },
                     options={
                         CONF_SCAN_INTERVAL: int(user_input.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)),
+                        CONF_SMARTMETER_INTERVAL: int(user_input.get(CONF_SMARTMETER_INTERVAL, DEFAULT_SMARTMETER_INTERVAL)),
                         CONF_SHIPS: [],
                     },
                 )
@@ -124,12 +131,14 @@ class KaiOptionsFlow(OptionsFlow):
     def _ships(self) -> list[dict]:
         return list(self.entry.options.get(CONF_SHIPS, []))
 
-    def _save(self, ships: list[dict] | None = None, interval: int | None = None):
+    def _save(self, ships: list[dict] | None = None, interval: int | None = None, sm_interval: int | None = None):
         opts = dict(self.entry.options)
         if ships is not None:
             opts[CONF_SHIPS] = ships
         if interval is not None:
             opts[CONF_SCAN_INTERVAL] = interval
+        if sm_interval is not None:
+            opts[CONF_SMARTMETER_INTERVAL] = sm_interval
         return self.async_create_entry(title="", data=opts)
 
     async def async_step_init(self, user_input=None) -> ConfigFlowResult:
@@ -163,12 +172,18 @@ class KaiOptionsFlow(OptionsFlow):
 
     async def async_step_interval(self, user_input=None) -> ConfigFlowResult:
         if user_input is not None:
-            return self._save(interval=int(user_input[CONF_SCAN_INTERVAL]))
+            return self._save(interval=int(user_input[CONF_SCAN_INTERVAL]),
+                              sm_interval=int(user_input[CONF_SMARTMETER_INTERVAL]))
         schema = vol.Schema({
             vol.Required(CONF_SCAN_INTERVAL,
                          default=int(self.entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))):
                 selector.NumberSelector(selector.NumberSelectorConfig(
                     min=MIN_SCAN_INTERVAL, max=3600, unit_of_measurement="s",
+                    mode=selector.NumberSelectorMode.BOX)),
+            vol.Required(CONF_SMARTMETER_INTERVAL,
+                         default=int(self.entry.options.get(CONF_SMARTMETER_INTERVAL, DEFAULT_SMARTMETER_INTERVAL))):
+                selector.NumberSelector(selector.NumberSelectorConfig(
+                    min=MIN_SCAN_INTERVAL, max=86400, unit_of_measurement="s",
                     mode=selector.NumberSelectorMode.BOX)),
         })
         return self.async_show_form(step_id="interval", data_schema=schema)
