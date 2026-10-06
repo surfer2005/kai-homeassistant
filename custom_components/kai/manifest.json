@@ -1,0 +1,12 @@
+{
+  "domain": "kai",
+  "name": "KAI Flottenbetrieb",
+  "codeowners": ["@bsb"],
+  "config_flow": true,
+  "documentation": "https://github.com/bsb/kai-homeassistant",
+  "issue_tracker": "https://github.com/bsb/kai-homeassistant/issues",
+  "integration_type": "service",
+  "iot_class": "cloud_push",
+  "requirements": [],
+  "version": "0.1.0"
+}

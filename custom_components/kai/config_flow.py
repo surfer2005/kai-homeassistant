@@ -1,0 +1,168 @@
+"""Config- und Options-Flow der KAI-Integration."""
+from __future__ import annotations
+
+from typing import Any
+
+import voluptuous as vol
+
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
+from homeassistant.core import callback
+from homeassistant.helpers import selector
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+from .api import KaiApiError, KaiClient
+from .const import (
+    CONF_API_KEY,
+    CONF_HEADING,
+    CONF_LAT,
+    CONF_LON,
+    CONF_POWER,
+    CONF_REGISTRATION,
+    CONF_SCAN_INTERVAL,
+    CONF_SHIPS,
+    CONF_SMARTMETER_KEY,
+    CONF_SPEED,
+    CONF_TRACKER,
+    CONF_URL,
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+    MIN_SCAN_INTERVAL,
+)
+
+CONNECTION_SCHEMA = vol.Schema({
+    vol.Required(CONF_URL): selector.TextSelector(),
+    vol.Required(CONF_API_KEY): selector.TextSelector(),
+    vol.Optional(CONF_SMARTMETER_KEY, default=""): selector.TextSelector(),
+    vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): selector.NumberSelector(
+        selector.NumberSelectorConfig(min=MIN_SCAN_INTERVAL, max=3600, unit_of_measurement="s",
+                                      mode=selector.NumberSelectorMode.BOX)
+    ),
+})
+
+
+def _ship_schema(defaults: dict | None = None) -> vol.Schema:
+    d = defaults or {}
+    return vol.Schema({
+        vol.Required(CONF_REGISTRATION, default=d.get(CONF_REGISTRATION, "")): selector.TextSelector(),
+        vol.Optional(CONF_TRACKER, default=d.get(CONF_TRACKER)): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain=["device_tracker", "person"])),
+        vol.Optional(CONF_LAT, default=d.get(CONF_LAT)): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain=["sensor", "input_number"])),
+        vol.Optional(CONF_LON, default=d.get(CONF_LON)): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain=["sensor", "input_number"])),
+        vol.Optional(CONF_SPEED, default=d.get(CONF_SPEED)): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain=["sensor", "input_number"])),
+        vol.Optional(CONF_HEADING, default=d.get(CONF_HEADING)): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain=["sensor", "input_number"])),
+        vol.Optional(CONF_POWER, default=d.get(CONF_POWER, [])): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain=["sensor"], multiple=True)),
+    })
+
+
+async def _validate(hass, data: dict) -> str | None:
+    """Verbindung prüfen. Gibt eine Fehlerkennung zurück oder None bei Erfolg."""
+    client = KaiClient(async_get_clientsession(hass), data[CONF_URL], data[CONF_API_KEY])
+    try:
+        await client.validate()
+    except KaiApiError as err:
+        return "invalid_auth" if "401" in str(err) else "cannot_connect"
+    return None
+
+
+class KaiConfigFlow(ConfigFlow, domain=DOMAIN):
+    """Verbindung zu einer KAI-Instanz einrichten."""
+
+    VERSION = 1
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            url = user_input[CONF_URL].rstrip("/")
+            await self.async_set_unique_id(url)
+            self._abort_if_unique_id_configured()
+            err = await _validate(self.hass, {CONF_URL: url, CONF_API_KEY: user_input[CONF_API_KEY]})
+            if err:
+                errors["base"] = err
+            else:
+                return self.async_create_entry(
+                    title=f"KAI ({url})",
+                    data={
+                        CONF_URL: url,
+                        CONF_API_KEY: user_input[CONF_API_KEY],
+                        CONF_SMARTMETER_KEY: user_input.get(CONF_SMARTMETER_KEY, "") or "",
+                    },
+                    options={
+                        CONF_SCAN_INTERVAL: int(user_input.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)),
+                        CONF_SHIPS: [],
+                    },
+                )
+        return self.async_show_form(step_id="user", data_schema=CONNECTION_SCHEMA, errors=errors)
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+        return KaiOptionsFlow(config_entry)
+
+
+class KaiOptionsFlow(OptionsFlow):
+    """Schiffe/Entities verwalten + Sende-Intervall."""
+
+    def __init__(self, entry: ConfigEntry) -> None:
+        self.entry = entry
+
+    def _ships(self) -> list[dict]:
+        return list(self.entry.options.get(CONF_SHIPS, []))
+
+    def _save(self, ships: list[dict] | None = None, interval: int | None = None):
+        opts = dict(self.entry.options)
+        if ships is not None:
+            opts[CONF_SHIPS] = ships
+        if interval is not None:
+            opts[CONF_SCAN_INTERVAL] = interval
+        return self.async_create_entry(title="", data=opts)
+
+    async def async_step_init(self, user_input=None) -> ConfigFlowResult:
+        return self.async_show_menu(
+            step_id="init",
+            menu_options=["add_ship", "remove_ship", "interval"],
+        )
+
+    async def async_step_add_ship(self, user_input=None) -> ConfigFlowResult:
+        if user_input is not None:
+            ship = {k: v for k, v in user_input.items() if v not in (None, "", [])}
+            ships = self._ships()
+            ships.append(ship)
+            return self._save(ships=ships)
+        return self.async_show_form(step_id="add_ship", data_schema=_ship_schema())
+
+    async def async_step_remove_ship(self, user_input=None) -> ConfigFlowResult:
+        ships = self._ships()
+        if not ships:
+            return self._save(ships=ships)
+        if user_input is not None:
+            keep = [s for s in ships if s.get(CONF_REGISTRATION) not in user_input.get("remove", [])]
+            return self._save(ships=keep)
+        regs = [s.get(CONF_REGISTRATION, "?") for s in ships]
+        schema = vol.Schema({
+            vol.Optional("remove", default=[]): selector.SelectSelector(
+                selector.SelectSelectorConfig(options=regs, multiple=True,
+                                              mode=selector.SelectSelectorMode.LIST)),
+        })
+        return self.async_show_form(step_id="remove_ship", data_schema=schema)
+
+    async def async_step_interval(self, user_input=None) -> ConfigFlowResult:
+        if user_input is not None:
+            return self._save(interval=int(user_input[CONF_SCAN_INTERVAL]))
+        schema = vol.Schema({
+            vol.Required(CONF_SCAN_INTERVAL,
+                         default=int(self.entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))):
+                selector.NumberSelector(selector.NumberSelectorConfig(
+                    min=MIN_SCAN_INTERVAL, max=3600, unit_of_measurement="s",
+                    mode=selector.NumberSelectorMode.BOX)),
+        })
+        return self.async_show_form(step_id="interval", data_schema=schema)

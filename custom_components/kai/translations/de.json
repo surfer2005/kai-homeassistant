@@ -1,0 +1,56 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "KAI verbinden",
+        "description": "Verbindung zur KAI-Instanz. Den Ingest-Key findest du in KAI unter Einstellungen → Schnittstellen → Schiffs-Telemetrie.",
+        "data": {
+          "url": "KAI-Adresse (z. B. https://kai-bsb.de)",
+          "api_key": "Telemetrie Ingest-Key",
+          "smartmeter_key": "Smartmeter Ingest-Key (optional)",
+          "scan_interval": "Sende-Intervall (Sekunden)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "KAI nicht erreichbar — Adresse prüfen.",
+      "invalid_auth": "Ungültiger Ingest-Key."
+    },
+    "abort": {
+      "already_configured": "Diese KAI-Instanz ist bereits eingerichtet."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "KAI — Schiffe & Einstellungen",
+        "menu_options": {
+          "add_ship": "Schiff hinzufügen",
+          "remove_ship": "Schiff entfernen",
+          "interval": "Sende-Intervall ändern"
+        }
+      },
+      "add_ship": {
+        "title": "Schiff hinzufügen",
+        "description": "Zulassungsnummer wie in KAI. Entweder einen Tracker (device_tracker/person mit Koordinaten) ODER einzelne Sensoren angeben.",
+        "data": {
+          "registration_number": "Zulassungsnummer (Schlüssel zum Schiff in KAI)",
+          "tracker_entity": "Tracker (Koordinaten/Geschwindigkeit in Attributen)",
+          "latitude_entity": "Sensor Breitengrad (optional)",
+          "longitude_entity": "Sensor Längengrad (optional)",
+          "speed_entity": "Sensor Geschwindigkeit in Knoten (optional)",
+          "heading_entity": "Sensor Kurs in Grad (optional)",
+          "power_entities": "Smartmeter-Sensoren (optional)"
+        }
+      },
+      "remove_ship": {
+        "title": "Schiff entfernen",
+        "data": { "remove": "Zu entfernende Schiffe" }
+      },
+      "interval": {
+        "title": "Sende-Intervall",
+        "data": { "scan_interval": "Sende-Intervall (Sekunden)" }
+      }
+    }
+  }
+}
