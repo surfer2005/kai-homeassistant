@@ -47,20 +47,26 @@ CONNECTION_SCHEMA = vol.Schema({
 
 def _ship_schema(defaults: dict | None = None) -> vol.Schema:
     d = defaults or {}
+
+    def marker(key, required=False):
+        # Vorgabe NUR setzen, wenn ein Wert existiert — sonst meldet ein leeres
+        # EntitySelector-Feld "Entity None is neither a valid entity ID".
+        if required:
+            return vol.Required(key, default=d.get(key, ""))
+        val = d.get(key)
+        return vol.Optional(key, default=val) if val not in (None, "", []) else vol.Optional(key)
+
+    entity = lambda *domains, multiple=False: selector.EntitySelector(  # noqa: E731
+        selector.EntitySelectorConfig(domain=list(domains), multiple=multiple))
+
     return vol.Schema({
-        vol.Required(CONF_REGISTRATION, default=d.get(CONF_REGISTRATION, "")): selector.TextSelector(),
-        vol.Optional(CONF_TRACKER, default=d.get(CONF_TRACKER)): selector.EntitySelector(
-            selector.EntitySelectorConfig(domain=["device_tracker", "person"])),
-        vol.Optional(CONF_LAT, default=d.get(CONF_LAT)): selector.EntitySelector(
-            selector.EntitySelectorConfig(domain=["sensor", "input_number"])),
-        vol.Optional(CONF_LON, default=d.get(CONF_LON)): selector.EntitySelector(
-            selector.EntitySelectorConfig(domain=["sensor", "input_number"])),
-        vol.Optional(CONF_SPEED, default=d.get(CONF_SPEED)): selector.EntitySelector(
-            selector.EntitySelectorConfig(domain=["sensor", "input_number"])),
-        vol.Optional(CONF_HEADING, default=d.get(CONF_HEADING)): selector.EntitySelector(
-            selector.EntitySelectorConfig(domain=["sensor", "input_number"])),
-        vol.Optional(CONF_POWER, default=d.get(CONF_POWER, [])): selector.EntitySelector(
-            selector.EntitySelectorConfig(domain=["sensor"], multiple=True)),
+        marker(CONF_REGISTRATION, required=True): selector.TextSelector(),
+        marker(CONF_TRACKER): entity("device_tracker", "person"),
+        marker(CONF_LAT): entity("sensor", "input_number"),
+        marker(CONF_LON): entity("sensor", "input_number"),
+        marker(CONF_SPEED): entity("sensor", "input_number"),
+        marker(CONF_HEADING): entity("sensor", "input_number"),
+        marker(CONF_POWER): entity("sensor", multiple=True),
     })
 
 
