@@ -22,6 +22,9 @@ CONF_HEADING = "heading_entity"
 CONF_POWER = "power_entities"           # Liste: einzelne Smartmeter-Sensoren → /api/landstrom/ingest
 CONF_POWER_LABELS = "power_labels"      # HA-Labels: ALLE Sensoren mit diesem Label
 CONF_POWER_AREAS = "power_areas"        # HA-Bereiche: ALLE Sensoren in diesem Bereich
+CONF_NMEA_PORT = "nmea_port"            # TCP-Port für NMEA-0183-Ausgabe (Seekarte/Plotter)
+
+DEFAULT_NMEA_PORT = 10110               # IANA-Standardport für NMEA 0183 über TCP
 
 DEFAULT_SCAN_INTERVAL = 10             # Sekunden (Position/Geschwindigkeit)
 DEFAULT_SMARTMETER_INTERVAL = 60       # Sekunden (Smartmeter, langsamer)

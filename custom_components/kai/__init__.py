@@ -1,6 +1,8 @@
 """KAI Flottenbetrieb — schickt HA-Daten (Position/Geschwindigkeit/Smartmeter) an KAI."""
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 from datetime import timedelta
 
@@ -13,8 +15,10 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
 from .api import KaiApiError, KaiClient
+from .nmea import build_sentences
 from .const import (
     CONF_API_KEY,
+    CONF_NMEA_PORT,
     CONF_HEADING,
     CONF_LAT,
     CONF_LON,
@@ -217,6 +221,74 @@ class KaiSender:
             _LOGGER.warning("KAI-Smartmeterübertragung fehlgeschlagen: %s", err)
 
 
+class ShipNmea:
+    """NMEA-0183-TCP-Server für EIN Schiff: Plotter/Seekarte verbindet sich zu HA-IP:Port,
+    wir streamen RMC/GGA/VTG (+ HDT) im Sekundentakt aus den HA-GPS-Werten. Ersetzt den COM-Server."""
+
+    def __init__(self, hass: HomeAssistant, sender: "KaiSender", ship: dict, port: int) -> None:
+        self.hass = hass
+        self.sender = sender
+        self.ship = ship
+        self.port = port
+        self.clients: set = set()
+        self.server = None
+        self.unsub = None
+
+    async def start(self) -> None:
+        try:
+            self.server = await asyncio.start_server(self._on_client, host="0.0.0.0", port=self.port)
+        except OSError as err:
+            _LOGGER.error("NMEA-TCP-Port %s konnte nicht geöffnet werden: %s", self.port, err)
+            return
+        self.unsub = async_track_time_interval(self.hass, self._tick, timedelta(seconds=1))
+        _LOGGER.info("NMEA-TCP-Ausgang für %s auf Port %s", self.ship.get(CONF_REGISTRATION), self.port)
+
+    async def _on_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        self.clients.add(writer)
+        try:
+            while not reader.at_eof():
+                if not await reader.read(256):
+                    break
+        except Exception:  # noqa: BLE001
+            pass
+        finally:
+            self.clients.discard(writer)
+            with contextlib.suppress(Exception):
+                writer.close()
+
+    async def _tick(self, _now=None) -> None:
+        if not self.clients:
+            return
+        pos = self.sender._position_for(self.ship)
+        if not pos:
+            return
+        data = "".join(build_sentences(
+            pos.get("latitude"), pos.get("longitude"),
+            pos.get("speed_kn"), pos.get("heading_deg"), pos.get("heading_deg"),
+        )).encode("ascii", "ignore")
+        if not data:
+            return
+        for w in list(self.clients):
+            try:
+                w.write(data)
+            except Exception:  # noqa: BLE001
+                self.clients.discard(w)
+                with contextlib.suppress(Exception):
+                    w.close()
+
+    async def stop(self) -> None:
+        if self.unsub:
+            self.unsub()
+        for w in list(self.clients):
+            with contextlib.suppress(Exception):
+                w.close()
+        self.clients.clear()
+        if self.server:
+            self.server.close()
+            with contextlib.suppress(Exception):
+                await self.server.wait_closed()
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     session = async_get_clientsession(hass)
     client = KaiClient(
@@ -234,7 +306,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         async_track_time_interval(hass, sender.async_update_smartmeter, timedelta(seconds=sm_interval)),
     ]
 
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {"sender": sender, "unsubs": unsubs}
+    # NMEA-0183-TCP-Ausgang je Schiff mit konfiguriertem Port (Seekarte/Plotter).
+    nmea: list[ShipNmea] = []
+    for ship in entry.options.get(CONF_SHIPS, []):
+        port = ship.get(CONF_NMEA_PORT)
+        try:
+            port = int(port) if port else 0
+        except (TypeError, ValueError):
+            port = 0
+        if port > 0:
+            srv = ShipNmea(hass, sender, ship, port)
+            await srv.start()
+            nmea.append(srv)
+
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {"sender": sender, "unsubs": unsubs, "nmea": nmea}
     entry.async_on_unload(entry.add_update_listener(_async_reload))
 
     # Sofort einmal senden, nicht erst nach dem ersten Intervall.
@@ -252,4 +337,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if data:
         for unsub in data.get("unsubs", []):
             unsub()
+        for srv in data.get("nmea", []):
+            await srv.stop()
     return True

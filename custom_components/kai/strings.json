@@ -43,7 +43,8 @@
           "heading_entity": "Sensor Kurs in Grad (optional)",
           "power_entities": "Smartmeter einzelne Sensoren (optional)",
           "power_labels": "Smartmeter per Label (alle Sensoren mit diesem Label)",
-          "power_areas": "Smartmeter per Bereich (alle Sensoren im Bereich)"
+          "power_areas": "Smartmeter per Bereich (alle Sensoren im Bereich)",
+          "nmea_port": "NMEA-TCP-Port für Seekarte/Plotter (optional, leer = aus; Standard 10110)"
         }
       },
       "remove_ship": {

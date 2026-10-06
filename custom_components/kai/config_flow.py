@@ -21,6 +21,7 @@ from .const import (
     CONF_HEADING,
     CONF_LAT,
     CONF_LON,
+    CONF_NMEA_PORT,
     CONF_POWER,
     CONF_POWER_AREAS,
     CONF_POWER_LABELS,
@@ -78,6 +79,8 @@ def _ship_schema(defaults: dict | None = None) -> vol.Schema:
         marker(CONF_POWER_LABELS): selector.LabelSelector(selector.LabelSelectorConfig(multiple=True)),
         marker(CONF_POWER_AREAS): selector.AreaSelector(selector.AreaSelectorConfig(multiple=True)),
         marker(CONF_POWER): entity("sensor", multiple=True),
+        # NMEA-0183-TCP-Ausgang für Seekarte/Plotter (leer = aus; Standard-Port 10110).
+        marker(CONF_NMEA_PORT): selector.NumberSelector(selector.NumberSelectorConfig(min=1, max=65535, mode=selector.NumberSelectorMode.BOX)),
     })
 
 

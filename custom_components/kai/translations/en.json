@@ -43,7 +43,8 @@
           "heading_entity": "Heading sensor in degrees (optional)",
           "power_entities": "Smart meter individual sensors (optional)",
           "power_labels": "Smart meter by label (all sensors with this label)",
-          "power_areas": "Smart meter by area (all sensors in the area)"
+          "power_areas": "Smart meter by area (all sensors in the area)",
+          "nmea_port": "NMEA TCP port for chart plotter (optional, empty = off; default 10110)"
         }
       },
       "remove_ship": {
