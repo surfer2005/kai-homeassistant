@@ -1,0 +1,149 @@
+"""Netz-Scanner an Bord: Geräte aus KAI ziehen, per IP (TCP/Ping) bzw. MAC (ARP) prüfen und
+online/offline an KAIs Asset-Konnektivität melden. Ersetzt die separate HA-Automation."""
+from __future__ import annotations
+
+import asyncio
+import ipaddress
+import logging
+import re
+
+import aiohttp
+
+from .const import ASSET_CONN_PATH, SCAN_TARGETS_PATH
+
+_LOGGER = logging.getLogger(__name__)
+
+
+def _norm_mac(m: str) -> str:
+    return re.sub(r"[^0-9a-f]", "", (m or "").lower())
+
+
+def read_arp() -> dict[str, str]:
+    """MAC(normalisiert) → IP aus der ARP-/Neighbor-Tabelle (Linux /proc/net/arp)."""
+    out: dict[str, str] = {}
+    try:
+        with open("/proc/net/arp", encoding="ascii") as f:
+            next(f, None)
+            for line in f:
+                p = line.split()
+                if len(p) >= 4 and p[3] and p[3] != "00:00:00:00:00:00":
+                    out[_norm_mac(p[3])] = p[0]
+    except OSError:
+        pass
+    return out
+
+
+async def _tcp_open(host: str, port: int, timeout: float = 2.0) -> bool:
+    try:
+        reader, writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout)
+        writer.close()
+        try:
+            await writer.wait_closed()
+        except Exception:  # noqa: BLE001
+            pass
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+async def _ping(host: str, timeout: int = 1) -> bool:
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "ping", "-c", "1", "-W", str(timeout), host,
+            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
+        )
+        return await asyncio.wait_for(proc.wait(), timeout + 2) == 0
+    except Exception:  # noqa: BLE001
+        return False
+
+
+async def _reachable(host: str, ports: list[int]) -> bool:
+    if ports:
+        results = await asyncio.gather(*(_tcp_open(host, p) for p in ports))
+        if any(results):
+            return True
+    # Kein offener Port (oder keine Ports konfiguriert) → Ping als Rückfall.
+    return await _ping(host)
+
+
+async def _sweep(subnet: str) -> None:
+    """Subnetz einmal anpingen, damit die ARP-Tabelle gefüllt ist (für MAC-Geräte)."""
+    try:
+        net = ipaddress.ip_network(subnet, strict=False)
+    except ValueError:
+        _LOGGER.warning("Ungültiges Scan-Subnetz: %s", subnet)
+        return
+    hosts = [str(h) for h in net.hosts()][:1024]
+    sem = asyncio.Semaphore(64)
+
+    async def one(ip):
+        async with sem:
+            await _ping(ip)
+
+    await asyncio.gather(*(one(ip) for ip in hosts))
+
+
+class KaiScanner:
+    """Zieht Scan-Ziele aus KAI, prüft Erreichbarkeit, meldet Status zurück."""
+
+    def __init__(self, session: aiohttp.ClientSession, base: str, key: str,
+                 subnet: str | None, ports: list[int]) -> None:
+        self._session = session
+        self._base = base.rstrip("/")
+        self._key = key
+        self._subnet = subnet
+        self._ports = ports
+
+    async def _targets(self) -> list[dict]:
+        async with self._session.get(
+            f"{self._base}{SCAN_TARGETS_PATH}",
+            headers={"X-API-Key": self._key},
+            timeout=aiohttp.ClientTimeout(total=20),
+        ) as resp:
+            if resp.status != 200:
+                raise RuntimeError(f"HTTP {resp.status}")
+            return (await resp.json(content_type=None)).get("items", [])
+
+    async def _report(self, items: list[dict]) -> None:
+        async with self._session.post(
+            f"{self._base}{ASSET_CONN_PATH}",
+            json=items,
+            headers={"X-API-Key": self._key},
+            timeout=aiohttp.ClientTimeout(total=20),
+        ) as resp:
+            await resp.read()
+
+    async def run(self, _now=None) -> None:
+        try:
+            targets = await self._targets()
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning("KAI-Scan-Ziele konnten nicht geladen werden: %s", err)
+            return
+        if not targets:
+            return
+        need_arp = any(not t.get("ip") and t.get("macs") for t in targets)
+        if need_arp and self._subnet:
+            await _sweep(self._subnet)
+        arp = read_arp() if need_arp else {}
+
+        out: list[dict] = []
+        for t in targets:
+            name = t.get("name")
+            if not name:
+                continue
+            online = False
+            ip = t.get("ip")
+            if ip:
+                online = await _reachable(ip, self._ports)
+            if not online:
+                for m in t.get("macs") or []:
+                    if _norm_mac(m) in arp:
+                        online = True
+                        break
+            out.append({"name": name, "entity": "network-scan", "domain": "network",
+                        "status": "online" if online else "offline"})
+        if out:
+            try:
+                await self._report(out)
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.warning("KAI-Konnektivität melden fehlgeschlagen: %s", err)

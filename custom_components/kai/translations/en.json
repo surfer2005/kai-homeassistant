@@ -9,7 +9,10 @@
           "api_key": "Telemetry ingest key",
           "smartmeter_key": "Smart-meter ingest key (optional)",
           "scan_interval": "Send interval position/speed (seconds)",
-          "smartmeter_scan_interval": "Send interval smart meter (seconds)"
+          "smartmeter_scan_interval": "Send interval smart meter (seconds)",
+          "ha_key": "Asset connectivity: ingest key (optional, enables the network scan)",
+          "scan_subnet": "Scan subnet for DHCP devices (e.g. 192.168.1.0/24)",
+          "scan_ports": "TCP ports for reachability check (e.g. 80,443,22)"
         }
       }
     },
@@ -57,7 +60,8 @@
         "title": "Send interval",
         "data": {
           "scan_interval": "Position/speed (seconds)",
-          "smartmeter_scan_interval": "Smart meter (seconds)"
+          "smartmeter_scan_interval": "Smart meter (seconds)",
+          "conn_scan_interval": "Network scan interval (seconds)"
         }
       }
     }

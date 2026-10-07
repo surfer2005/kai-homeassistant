@@ -16,9 +16,14 @@ from homeassistant.util import dt as dt_util
 
 from .api import KaiApiError, KaiClient
 from .nmea import build_sentences
+from .connectivity import KaiScanner
 from .const import (
     CONF_API_KEY,
+    CONF_CONN_INTERVAL,
+    CONF_HA_KEY,
     CONF_NMEA_PORT,
+    CONF_SCAN_PORTS,
+    CONF_SCAN_SUBNET,
     CONF_HEADING,
     CONF_LAT,
     CONF_LON,
@@ -33,7 +38,9 @@ from .const import (
     CONF_SPEED,
     CONF_TRACKER,
     CONF_URL,
+    DEFAULT_CONN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_SCAN_PORTS,
     DEFAULT_SMARTMETER_INTERVAL,
     DOMAIN,
 )
@@ -318,6 +325,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             srv = ShipNmea(hass, sender, ship, port)
             await srv.start()
             nmea.append(srv)
+
+    # Netz-Scan der Asset-Konnektivität (Geräte aus KAI ziehen, IP/MAC prüfen, Status melden).
+    ha_key = (entry.data.get(CONF_HA_KEY) or "").strip()
+    if ha_key:
+        ports = [int(p) for p in str(entry.data.get(CONF_SCAN_PORTS, DEFAULT_SCAN_PORTS)).replace(" ", "").split(",") if p.isdigit()]
+        scanner = KaiScanner(session, entry.data[CONF_URL], ha_key, entry.data.get(CONF_SCAN_SUBNET) or None, ports)
+        ci = max(10, int(entry.options.get(CONF_CONN_INTERVAL, DEFAULT_CONN_INTERVAL)))
+        unsubs.append(async_track_time_interval(hass, scanner.run, timedelta(seconds=ci)))
+        hass.async_create_task(scanner.run())
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {"sender": sender, "unsubs": unsubs, "nmea": nmea}
     entry.async_on_unload(entry.add_update_listener(_async_reload))

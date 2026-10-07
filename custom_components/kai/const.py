@@ -32,3 +32,13 @@ MIN_SCAN_INTERVAL = 1                   # bis 1 s (hohe Auflösung, z. B. für U
 
 TELEMETRY_PATH = "/api/telemetry/ingest"
 SMARTMETER_PATH = "/api/landstrom/ingest"
+SCAN_TARGETS_PATH = "/api/asset-manager/scan-targets"
+ASSET_CONN_PATH = "/api/asset-manager/ha-connectivity"
+
+# Netz-Scan (Asset-Konnektivität an Bord): Geräte aus KAI ziehen, per IP/MAC prüfen, Status melden.
+CONF_HA_KEY = "ha_key"                   # am_ha_ingest_key (Scan-Ziele lesen + Status melden)
+CONF_SCAN_SUBNET = "scan_subnet"         # z. B. 192.168.1.0/24 (für MAC/DHCP-Geräte: ARP-Sweep)
+CONF_SCAN_PORTS = "scan_ports"           # TCP-Ports für den Erreichbarkeits-Check
+CONF_CONN_INTERVAL = "conn_scan_interval"
+DEFAULT_CONN_INTERVAL = 60
+DEFAULT_SCAN_PORTS = "80,443,22"

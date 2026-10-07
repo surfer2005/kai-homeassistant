@@ -20,8 +20,12 @@ from .const import (
     CONF_API_KEY,
     CONF_HEADING,
     CONF_LAT,
+    CONF_CONN_INTERVAL,
+    CONF_HA_KEY,
     CONF_LON,
     CONF_NMEA_PORT,
+    CONF_SCAN_PORTS,
+    CONF_SCAN_SUBNET,
     CONF_POWER,
     CONF_POWER_AREAS,
     CONF_POWER_LABELS,
@@ -33,7 +37,9 @@ from .const import (
     CONF_SPEED,
     CONF_TRACKER,
     CONF_URL,
+    DEFAULT_CONN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_SCAN_PORTS,
     DEFAULT_SMARTMETER_INTERVAL,
     DOMAIN,
     MIN_SCAN_INTERVAL,
@@ -51,6 +57,9 @@ CONNECTION_SCHEMA = vol.Schema({
         selector.NumberSelectorConfig(min=MIN_SCAN_INTERVAL, max=86400, unit_of_measurement="s",
                                       mode=selector.NumberSelectorMode.BOX)
     ),
+    vol.Optional(CONF_HA_KEY, default=""): selector.TextSelector(),
+    vol.Optional(CONF_SCAN_SUBNET, default=""): selector.TextSelector(),
+    vol.Optional(CONF_SCAN_PORTS, default=DEFAULT_SCAN_PORTS): selector.TextSelector(),
 })
 
 
@@ -115,10 +124,14 @@ class KaiConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_URL: url,
                         CONF_API_KEY: user_input[CONF_API_KEY],
                         CONF_SMARTMETER_KEY: user_input.get(CONF_SMARTMETER_KEY, "") or "",
+                        CONF_HA_KEY: user_input.get(CONF_HA_KEY, "") or "",
+                        CONF_SCAN_SUBNET: user_input.get(CONF_SCAN_SUBNET, "") or "",
+                        CONF_SCAN_PORTS: user_input.get(CONF_SCAN_PORTS, DEFAULT_SCAN_PORTS) or DEFAULT_SCAN_PORTS,
                     },
                     options={
                         CONF_SCAN_INTERVAL: int(user_input.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)),
                         CONF_SMARTMETER_INTERVAL: int(user_input.get(CONF_SMARTMETER_INTERVAL, DEFAULT_SMARTMETER_INTERVAL)),
+                        CONF_CONN_INTERVAL: DEFAULT_CONN_INTERVAL,
                         CONF_SHIPS: [],
                     },
                 )
@@ -139,7 +152,7 @@ class KaiOptionsFlow(OptionsFlow):
     def _ships(self) -> list[dict]:
         return list(self.entry.options.get(CONF_SHIPS, []))
 
-    def _save(self, ships: list[dict] | None = None, interval: int | None = None, sm_interval: int | None = None):
+    def _save(self, ships: list[dict] | None = None, interval: int | None = None, sm_interval: int | None = None, conn_interval: int | None = None):
         opts = dict(self.entry.options)
         if ships is not None:
             opts[CONF_SHIPS] = ships
@@ -147,6 +160,8 @@ class KaiOptionsFlow(OptionsFlow):
             opts[CONF_SCAN_INTERVAL] = interval
         if sm_interval is not None:
             opts[CONF_SMARTMETER_INTERVAL] = sm_interval
+        if conn_interval is not None:
+            opts[CONF_CONN_INTERVAL] = conn_interval
         return self.async_create_entry(title="", data=opts)
 
     async def async_step_init(self, user_input=None) -> ConfigFlowResult:
@@ -181,7 +196,8 @@ class KaiOptionsFlow(OptionsFlow):
     async def async_step_interval(self, user_input=None) -> ConfigFlowResult:
         if user_input is not None:
             return self._save(interval=int(user_input[CONF_SCAN_INTERVAL]),
-                              sm_interval=int(user_input[CONF_SMARTMETER_INTERVAL]))
+                              sm_interval=int(user_input[CONF_SMARTMETER_INTERVAL]),
+                              conn_interval=int(user_input.get(CONF_CONN_INTERVAL, DEFAULT_CONN_INTERVAL)))
         schema = vol.Schema({
             vol.Required(CONF_SCAN_INTERVAL,
                          default=int(self.entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))):
@@ -192,6 +208,11 @@ class KaiOptionsFlow(OptionsFlow):
                          default=int(self.entry.options.get(CONF_SMARTMETER_INTERVAL, DEFAULT_SMARTMETER_INTERVAL))):
                 selector.NumberSelector(selector.NumberSelectorConfig(
                     min=MIN_SCAN_INTERVAL, max=86400, unit_of_measurement="s",
+                    mode=selector.NumberSelectorMode.BOX)),
+            vol.Required(CONF_CONN_INTERVAL,
+                         default=int(self.entry.options.get(CONF_CONN_INTERVAL, DEFAULT_CONN_INTERVAL))):
+                selector.NumberSelector(selector.NumberSelectorConfig(
+                    min=10, max=86400, unit_of_measurement="s",
                     mode=selector.NumberSelectorMode.BOX)),
         })
         return self.async_show_form(step_id="interval", data_schema=schema)
