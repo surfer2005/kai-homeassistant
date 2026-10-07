@@ -31,6 +31,7 @@ from .const import (
     CONF_POWER_AREAS,
     CONF_POWER_LABELS,
     CONF_REGISTRATION,
+    CONF_SHIP_NAME,
     CONF_SCAN_INTERVAL,
     CONF_SHIPS,
     CONF_SMARTMETER_INTERVAL,
@@ -79,6 +80,7 @@ def _ship_schema(defaults: dict | None = None) -> vol.Schema:
 
     return vol.Schema({
         marker(CONF_REGISTRATION, required=True): selector.TextSelector(),
+        marker(CONF_SHIP_NAME): selector.TextSelector(),
         marker(CONF_TRACKER): entity("device_tracker", "person"),
         marker(CONF_LAT): entity("sensor", "input_number"),
         marker(CONF_LON): entity("sensor", "input_number"),
@@ -179,6 +181,14 @@ class KaiOptionsFlow(OptionsFlow):
             return self._save(ships=ships)
         return self.async_show_form(step_id="add_ship", data_schema=_ship_schema())
 
+    def _ship_options(self):
+        out = []
+        for s in self._ships():
+            reg = s.get(CONF_REGISTRATION, "?")
+            nm = s.get(CONF_SHIP_NAME)
+            out.append(selector.SelectOptionDict(value=reg, label=f"{reg} — {nm}" if nm else reg))
+        return out
+
     async def async_step_edit_ship(self, user_input=None) -> ConfigFlowResult:
         ships = self._ships()
         if not ships:
@@ -186,10 +196,10 @@ class KaiOptionsFlow(OptionsFlow):
         if user_input is not None:
             self._edit_reg = user_input["ship"]
             return await self.async_step_edit_ship_form()
-        regs = [s.get(CONF_REGISTRATION, "?") for s in ships]
+        opts = self._ship_options()
         schema = vol.Schema({
-            vol.Required("ship", default=regs[0]): selector.SelectSelector(
-                selector.SelectSelectorConfig(options=regs, mode=selector.SelectSelectorMode.DROPDOWN)),
+            vol.Required("ship", default=opts[0]["value"]): selector.SelectSelector(
+                selector.SelectSelectorConfig(options=opts, mode=selector.SelectSelectorMode.DROPDOWN)),
         })
         return self.async_show_form(step_id="edit_ship", data_schema=schema)
 
@@ -211,10 +221,9 @@ class KaiOptionsFlow(OptionsFlow):
         if user_input is not None:
             keep = [s for s in ships if s.get(CONF_REGISTRATION) not in user_input.get("remove", [])]
             return self._save(ships=keep)
-        regs = [s.get(CONF_REGISTRATION, "?") for s in ships]
         schema = vol.Schema({
             vol.Optional("remove", default=[]): selector.SelectSelector(
-                selector.SelectSelectorConfig(options=regs, multiple=True,
+                selector.SelectSelectorConfig(options=self._ship_options(), multiple=True,
                                               mode=selector.SelectSelectorMode.LIST)),
         })
         return self.async_show_form(step_id="remove_ship", data_schema=schema)

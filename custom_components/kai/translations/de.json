@@ -39,6 +39,7 @@
         "description": "Zulassungsnummer wie in KAI. Entweder einen Tracker (device_tracker/person mit Koordinaten) ODER einzelne Sensoren angeben.",
         "data": {
           "registration_number": "Zulassungsnummer (Schlüssel zum Schiff in KAI)",
+          "ship_name": "Bezeichnung / Name (optional)",
           "tracker_entity": "Tracker (Koordinaten/Geschwindigkeit in Attributen)",
           "latitude_entity": "Sensor Breitengrad (optional)",
           "longitude_entity": "Sensor Längengrad (optional)",
@@ -75,6 +76,7 @@
         "description": "Zulassungsnummer wie in KAI. Entweder einen Tracker (device_tracker/person mit Koordinaten) ODER einzelne Sensoren angeben.",
         "data": {
           "registration_number": "Zulassungsnummer (Schlüssel zum Schiff in KAI)",
+          "ship_name": "Bezeichnung / Name (optional)",
           "tracker_entity": "Tracker (Koordinaten/Geschwindigkeit in Attributen)",
           "latitude_entity": "Sensor Breitengrad (optional)",
           "longitude_entity": "Sensor Längengrad (optional)",

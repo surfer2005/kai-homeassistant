@@ -39,6 +39,7 @@
         "description": "Registration number as in KAI. Provide either a tracker (device_tracker/person with coordinates) OR individual sensors.",
         "data": {
           "registration_number": "Registration number (key to the ship in KAI)",
+          "ship_name": "Label / name (optional)",
           "tracker_entity": "Tracker (coordinates/speed in attributes)",
           "latitude_entity": "Latitude sensor (optional)",
           "longitude_entity": "Longitude sensor (optional)",
@@ -75,6 +76,7 @@
         "description": "Registration number as in KAI. Provide either a tracker (device_tracker/person with coordinates) OR individual sensors.",
         "data": {
           "registration_number": "Registration number (key to the ship in KAI)",
+          "ship_name": "Label / name (optional)",
           "tracker_entity": "Tracker (coordinates/speed in attributes)",
           "latitude_entity": "Latitude sensor (optional)",
           "longitude_entity": "Longitude sensor (optional)",

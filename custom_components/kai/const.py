@@ -14,6 +14,7 @@ CONF_SHIPS = "ships"
 
 # Je Schiff
 CONF_REGISTRATION = "registration_number"
+CONF_SHIP_NAME = "ship_name"   # optionale Bezeichnung (nur zur Anzeige/Beschriftung)
 CONF_TRACKER = "tracker_entity"         # device_tracker/person mit lat/lon (+ ggf. speed) in Attributen
 CONF_LAT = "latitude_entity"            # alternativ: eigener Sensor
 CONF_LON = "longitude_entity"
