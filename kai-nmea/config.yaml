@@ -1,5 +1,5 @@
 name: KAI NMEA Bridge
-version: "1.0.0"
+version: "1.0.1"
 slug: kai_nmea
 description: >-
   NMEA-0183 über TCP aus Home-Assistant-GPS-Werten für Seekarte/Plotter.
@@ -12,7 +12,6 @@ arch:
   - armv7
   - armhf
   - i386
-init: false
 startup: application
 boot: auto
 homeassistant_api: true
