@@ -72,7 +72,9 @@ async def _rdns(ip: str, timeout: float = 0.6) -> str | None:
     try:
         loop = asyncio.get_running_loop()
         name, _, _ = await asyncio.wait_for(loop.run_in_executor(None, socket.gethostbyaddr, ip), timeout)
-        return (name or "").split(".")[0] or None
+        label = (name or "").split(".")[0]
+        # IP-artige PTR-Antworten (z. B. "192" aus "192.168.73.9") sind kein echter Hostname.
+        return label if (label and not label.isdigit()) else None
     except Exception:  # noqa: BLE001
         return None
 
@@ -197,10 +199,23 @@ class KaiScanner:
         # Unbekannte Geräte im Netz (per ARP gefunden, zu keinem Ziel gehörend) als „nicht
         # zuordenbar" melden — mit MAC/IP/Hostname, damit sie im Asset Manager einem Asset
         # zugeordnet werden können. Danach matcht der nächste Scan sie automatisch über die MAC.
+        net = None
+        if self._subnet:
+            try:
+                net = ipaddress.ip_network(self._subnet, strict=False)
+            except ValueError:
+                net = None
         if self._discover and arp:
             for mac_n, ip in arp.items():
                 if mac_n in known_macs:
                     continue
+                # Nur Geräte im konfigurierten Scan-Subnetz (HA-interne Docker-Netze wie 172.30.x raus).
+                if net is not None:
+                    try:
+                        if ipaddress.ip_address(ip) not in net:
+                            continue
+                    except ValueError:
+                        continue
                 hostname = await _rdns(ip)
                 out.append({"name": hostname or ip, "entity": mac_n, "domain": "network",
                             "status": "online", "mac": mac_n, "ip": ip, "hostname": hostname,
