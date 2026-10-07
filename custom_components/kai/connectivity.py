@@ -77,8 +77,33 @@ async def _rdns(ip: str, timeout: float = 0.6) -> str | None:
         return None
 
 
-async def _sweep(subnet: str) -> None:
-    """Subnetz einmal anpingen, damit die ARP-Tabelle gefüllt ist (für MAC-Geräte)."""
+async def _arp_prime(host: str, ports: list[int]) -> None:
+    """Ein Gerät einmal „anstupsen", damit der Kernel seine MAC auflöst (→ ARP-Tabelle).
+    Per TCP-Verbindungsversuch statt Ping: funktioniert im HA-Container OHNE Root/Raw-Sockets.
+    Ob der Port offen ist, ist egal — schon der Verbindungsversuch (auch „refused") löst ARP auf."""
+    for p in (ports or [80, 443, 22]):
+        try:
+            fut = asyncio.open_connection(host, p)
+            reader, writer = await asyncio.wait_for(fut, 0.5)
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except Exception:  # noqa: BLE001
+                pass
+            return
+        except (ConnectionRefusedError, OSError) as err:
+            # „Connection refused" = Host ist da (ARP aufgelöst) → fertig.
+            if isinstance(err, ConnectionRefusedError):
+                return
+            continue
+        except asyncio.TimeoutError:
+            continue
+    # Rückfall: Ping (falls im Container doch verfügbar).
+    await _ping(host)
+
+
+async def _sweep(subnet: str, ports: list[int]) -> None:
+    """Subnetz einmal anstupsen (TCP, Ping-Rückfall), damit die ARP-Tabelle gefüllt ist."""
     try:
         net = ipaddress.ip_network(subnet, strict=False)
     except ValueError:
@@ -89,7 +114,7 @@ async def _sweep(subnet: str) -> None:
 
     async def one(ip):
         async with sem:
-            await _ping(ip)
+            await _arp_prime(ip, ports)
 
     await asyncio.gather(*(one(ip) for ip in hosts))
 
@@ -138,7 +163,7 @@ class KaiScanner:
         # entdeckt werden sollen (DHCP-Geräte für die Zuordnung im Asset Manager sichtbar machen).
         do_arp = bool(self._subnet) and (need_arp or self._discover)
         if do_arp:
-            await _sweep(self._subnet)
+            await _sweep(self._subnet, self._ports)
         arp = read_arp() if do_arp else {}
 
         out: list[dict] = []
@@ -174,6 +199,9 @@ class KaiScanner:
                 out.append({"name": hostname or ip, "entity": mac_n, "domain": "network",
                             "status": "online", "mac": mac_n, "ip": ip, "hostname": hostname})
 
+        entdeckt = sum(1 for o in out if o.get("entity") != "network-scan")
+        _LOGGER.debug("KAI-Scan: %d Ziele aus KAI, %d ARP-Einträge, %d gemeldet (davon %d entdeckt)",
+                      len(targets), len(arp), len(out), entdeckt)
         if out:
             try:
                 await self._report(out)
