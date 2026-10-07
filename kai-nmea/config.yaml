@@ -1,0 +1,34 @@
+name: KAI NMEA Bridge
+version: "1.0.0"
+slug: kai_nmea
+description: >-
+  NMEA-0183 über TCP aus Home-Assistant-GPS-Werten für Seekarte/Plotter.
+  Läuft als eigener Dienst und übersteht Neustarts von Home Assistant Core
+  (die Verbindung der Seekarte bleibt bestehen, kein erneutes Speichern nötig).
+url: https://github.com/surfer2005/kai-homeassistant/tree/main/kai-nmea
+arch:
+  - aarch64
+  - amd64
+  - armv7
+  - armhf
+  - i386
+init: false
+startup: application
+boot: auto
+homeassistant_api: true
+ports:
+  "10110/tcp": 10110
+ports_description:
+  "10110/tcp": NMEA-0183 TCP — hierher verbindet sich die Seekarte/der Plotter
+options:
+  registration_number: ""
+  latitude_entity: ""
+  longitude_entity: ""
+  speed_entity: ""
+  heading_entity: ""
+schema:
+  registration_number: str?
+  latitude_entity: str
+  longitude_entity: str
+  speed_entity: str?
+  heading_entity: str?
