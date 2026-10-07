@@ -121,6 +121,34 @@ async def _sweep(subnet: str, ports: list[int]) -> None:
     await asyncio.gather(*(one(ip) for ip in hosts))
 
 
+def _self_device(net, reg):
+    """Der HA-Rechner selbst — steht NIE in der eigenen ARP-Tabelle, muss separat gemeldet werden."""
+    import socket as _socket
+    import uuid as _uuid
+    try:
+        s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+        s.connect((str(next(net.hosts())), 9))  # UDP: kein Paket, nur eigene Quell-IP ermitteln
+        ip = s.getsockname()[0]
+        s.close()
+    except Exception:  # noqa: BLE001
+        return None
+    try:
+        if ipaddress.ip_address(ip) not in net:
+            return None
+    except ValueError:
+        return None
+    node = _uuid.getnode()
+    mac = None
+    if not (node >> 40) & 0x01:  # kein zufaellig erzeugter Wert (Multicast-Bit)
+        mac = "".join(f"{(node >> b) & 0xff:02x}" for b in range(40, -1, -8))
+    try:
+        host = _socket.gethostname()
+    except Exception:  # noqa: BLE001
+        host = None
+    return {"name": host or ip, "entity": mac or f"self-{ip}", "domain": "network",
+            "status": "online", "mac": mac, "ip": ip, "hostname": host, "registration_number": reg}
+
+
 class KaiScanner:
     """Zieht Scan-Ziele aus KAI, prüft Erreichbarkeit, meldet Status zurück."""
 
@@ -221,6 +249,11 @@ class KaiScanner:
                             "status": "online", "mac": mac_n, "ip": ip, "hostname": hostname,
                             "registration_number": self._reg})
 
+        # Den HA-Rechner selbst mitmelden (fehlt sonst, da nicht in eigener ARP-Tabelle).
+        if self._discover and net is not None:
+            selfdev = _self_device(net, self._reg)
+            if selfdev and _norm_mac(selfdev.get("mac") or "") not in known_macs:
+                out.append(selfdev)
         entdeckt = sum(1 for o in out if o.get("entity") != "network-scan")
         _LOGGER.debug("KAI-Scan: %d Ziele aus KAI, %d ARP-Einträge, %d gemeldet (davon %d entdeckt)",
                       len(targets), len(arp), len(out), entdeckt)
