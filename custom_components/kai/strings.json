@@ -6,11 +6,9 @@
         "description": "Verbindung zur KAI-Instanz. Den Ingest-Key findest du in KAI unter Einstellungen → Schnittstellen → Schiffs-Telemetrie.",
         "data": {
           "url": "KAI-Adresse (z. B. https://kai-bsb.de)",
-          "api_key": "Telemetrie Ingest-Key",
-          "smartmeter_key": "Smartmeter Ingest-Key (optional)",
+          "api_key": "KAI-Schlüssel (ein Schlüssel für alles: Position, Smartmeter, Konnektivität)",
           "scan_interval": "Sende-Intervall Position/Geschwindigkeit (Sekunden)",
           "smartmeter_scan_interval": "Sende-Intervall Smartmeter (Sekunden)",
-          "ha_key": "Asset-Konnektivität: Ingest-Key (optional, aktiviert den Netz-Scan)",
           "scan_subnet": "Scan-Subnetz für DHCP-Geräte (z. B. 192.168.1.0/24)",
           "scan_ports": "TCP-Ports für Erreichbarkeits-Check (z. B. 80,443,22)",
           "scan_discover": "Unbekannte Netz-Geräte melden (zum Zuordnen im Asset Manager)"

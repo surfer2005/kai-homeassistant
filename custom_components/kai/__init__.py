@@ -328,11 +328,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             nmea.append(srv)
 
     # Netz-Scan der Asset-Konnektivität (Geräte aus KAI ziehen, IP/MAC prüfen, Status melden).
-    ha_key = (entry.data.get(CONF_HA_KEY) or "").strip()
-    if ha_key:
+    # Netz-Scan aktiviert sich, sobald ein Scan-Subnetz eingetragen ist (opt-in). Schlüssel ist der
+    # eigene CONF_HA_KEY, sonst der gemeinsame Hauptschlüssel (ein Schlüssel für alles).
+    scan_key = (entry.data.get(CONF_HA_KEY) or entry.data.get(CONF_API_KEY) or "").strip()
+    subnet = (entry.data.get(CONF_SCAN_SUBNET) or "").strip() or None
+    if scan_key and subnet:
         ports = [int(p) for p in str(entry.data.get(CONF_SCAN_PORTS, DEFAULT_SCAN_PORTS)).replace(" ", "").split(",") if p.isdigit()]
         discover = bool(entry.data.get(CONF_SCAN_DISCOVER, True))
-        scanner = KaiScanner(session, entry.data[CONF_URL], ha_key, entry.data.get(CONF_SCAN_SUBNET) or None, ports, discover)
+        scanner = KaiScanner(session, entry.data[CONF_URL], scan_key, subnet, ports, discover)
         ci = max(10, int(entry.options.get(CONF_CONN_INTERVAL, DEFAULT_CONN_INTERVAL)))
         unsubs.append(async_track_time_interval(hass, scanner.run, timedelta(seconds=ci)))
         hass.async_create_task(scanner.run())

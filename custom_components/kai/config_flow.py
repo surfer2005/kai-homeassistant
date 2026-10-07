@@ -49,7 +49,6 @@ from .const import (
 CONNECTION_SCHEMA = vol.Schema({
     vol.Required(CONF_URL): selector.TextSelector(),
     vol.Required(CONF_API_KEY): selector.TextSelector(),
-    vol.Optional(CONF_SMARTMETER_KEY, default=""): selector.TextSelector(),
     vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): selector.NumberSelector(
         selector.NumberSelectorConfig(min=MIN_SCAN_INTERVAL, max=3600, unit_of_measurement="s",
                                       mode=selector.NumberSelectorMode.BOX)
@@ -58,7 +57,6 @@ CONNECTION_SCHEMA = vol.Schema({
         selector.NumberSelectorConfig(min=MIN_SCAN_INTERVAL, max=86400, unit_of_measurement="s",
                                       mode=selector.NumberSelectorMode.BOX)
     ),
-    vol.Optional(CONF_HA_KEY, default=""): selector.TextSelector(),
     vol.Optional(CONF_SCAN_SUBNET, default=""): selector.TextSelector(),
     vol.Optional(CONF_SCAN_PORTS, default=DEFAULT_SCAN_PORTS): selector.TextSelector(),
     vol.Optional(CONF_SCAN_DISCOVER, default=True): selector.BooleanSelector(),
@@ -125,8 +123,8 @@ class KaiConfigFlow(ConfigFlow, domain=DOMAIN):
                     data={
                         CONF_URL: url,
                         CONF_API_KEY: user_input[CONF_API_KEY],
-                        CONF_SMARTMETER_KEY: user_input.get(CONF_SMARTMETER_KEY, "") or "",
-                        CONF_HA_KEY: user_input.get(CONF_HA_KEY, "") or "",
+                        CONF_SMARTMETER_KEY: "",
+                        CONF_HA_KEY: "",
                         CONF_SCAN_SUBNET: user_input.get(CONF_SCAN_SUBNET, "") or "",
                         CONF_SCAN_PORTS: user_input.get(CONF_SCAN_PORTS, DEFAULT_SCAN_PORTS) or DEFAULT_SCAN_PORTS,
                         CONF_SCAN_DISCOVER: bool(user_input.get(CONF_SCAN_DISCOVER, True)),

@@ -6,11 +6,9 @@
         "description": "Connection to your KAI instance. Find the ingest key in KAI under Settings → Interfaces → Ship telemetry.",
         "data": {
           "url": "KAI address (e.g. https://kai-bsb.de)",
-          "api_key": "Telemetry ingest key",
-          "smartmeter_key": "Smart-meter ingest key (optional)",
+          "api_key": "KAI key (one key for everything: position, smart-meter, connectivity)",
           "scan_interval": "Send interval position/speed (seconds)",
           "smartmeter_scan_interval": "Send interval smart meter (seconds)",
-          "ha_key": "Asset connectivity: ingest key (optional, enables the network scan)",
           "scan_subnet": "Scan subnet for DHCP devices (e.g. 192.168.1.0/24)",
           "scan_ports": "TCP ports for reachability check (e.g. 80,443,22)",
           "scan_discover": "Report unknown network devices (to assign in the Asset Manager)"

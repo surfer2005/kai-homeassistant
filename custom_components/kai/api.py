@@ -22,7 +22,8 @@ class KaiClient:
         self._session = session
         self._base = url.rstrip("/")
         self._api_key = api_key
-        self._smartmeter_key = smartmeter_key
+        # Ein Schlüssel für alles: fehlt ein eigener Smartmeter-Schlüssel, gilt der Hauptschlüssel.
+        self._smartmeter_key = smartmeter_key or api_key
 
     async def _post(self, path: str, key: str, payload) -> dict:
         try:
