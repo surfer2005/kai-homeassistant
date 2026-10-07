@@ -156,7 +156,10 @@ class KaiScanner:
         except Exception as err:  # noqa: BLE001
             _LOGGER.warning("KAI-Scan-Ziele konnten nicht geladen werden: %s", err)
             return
-        if not targets:
+        # NICHT abbrechen, wenn KAI (noch) keine Ziele hat: die Entdeckung unbekannter Geräte soll
+        # genau dann laufen (z. B. bevor Assets importiert sind). Nur abbrechen, wenn es nichts zu
+        # tun gibt — keine Ziele UND keine Entdeckung.
+        if not targets and not (self._discover and self._subnet):
             return
         need_arp = any(not t.get("ip") and t.get("macs") for t in targets)
         # Mit Subnetz wird gesweept, sobald MAC-Geräte zu prüfen sind ODER unbekannte Geräte
