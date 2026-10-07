@@ -40,5 +40,7 @@ CONF_HA_KEY = "ha_key"                   # am_ha_ingest_key (Scan-Ziele lesen + 
 CONF_SCAN_SUBNET = "scan_subnet"         # z. B. 192.168.1.0/24 (für MAC/DHCP-Geräte: ARP-Sweep)
 CONF_SCAN_PORTS = "scan_ports"           # TCP-Ports für den Erreichbarkeits-Check
 CONF_CONN_INTERVAL = "conn_scan_interval"
+CONF_SCAN_DISCOVER = "scan_discover"   # unbekannte Netz-Geraete als „nicht zuordenbar" melden
 DEFAULT_CONN_INTERVAL = 60
 DEFAULT_SCAN_PORTS = "80,443,22"
+DEFAULT_SCAN_DISCOVER = True

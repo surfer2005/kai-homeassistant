@@ -24,6 +24,7 @@ from .const import (
     CONF_HA_KEY,
     CONF_LON,
     CONF_NMEA_PORT,
+    CONF_SCAN_DISCOVER,
     CONF_SCAN_PORTS,
     CONF_SCAN_SUBNET,
     CONF_POWER,
@@ -60,6 +61,7 @@ CONNECTION_SCHEMA = vol.Schema({
     vol.Optional(CONF_HA_KEY, default=""): selector.TextSelector(),
     vol.Optional(CONF_SCAN_SUBNET, default=""): selector.TextSelector(),
     vol.Optional(CONF_SCAN_PORTS, default=DEFAULT_SCAN_PORTS): selector.TextSelector(),
+    vol.Optional(CONF_SCAN_DISCOVER, default=True): selector.BooleanSelector(),
 })
 
 
@@ -127,6 +129,7 @@ class KaiConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_HA_KEY: user_input.get(CONF_HA_KEY, "") or "",
                         CONF_SCAN_SUBNET: user_input.get(CONF_SCAN_SUBNET, "") or "",
                         CONF_SCAN_PORTS: user_input.get(CONF_SCAN_PORTS, DEFAULT_SCAN_PORTS) or DEFAULT_SCAN_PORTS,
+                        CONF_SCAN_DISCOVER: bool(user_input.get(CONF_SCAN_DISCOVER, True)),
                     },
                     options={
                         CONF_SCAN_INTERVAL: int(user_input.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)),

@@ -6,6 +6,7 @@ import asyncio
 import ipaddress
 import logging
 import re
+import socket
 
 import aiohttp
 
@@ -66,6 +67,16 @@ async def _reachable(host: str, ports: list[int]) -> bool:
     return await _ping(host)
 
 
+async def _rdns(ip: str, timeout: float = 0.6) -> str | None:
+    """Best-effort Reverse-DNS (Hostname) für ein entdecktes Gerät; leer, wenn es nicht auflöst."""
+    try:
+        loop = asyncio.get_running_loop()
+        name, _, _ = await asyncio.wait_for(loop.run_in_executor(None, socket.gethostbyaddr, ip), timeout)
+        return (name or "").split(".")[0] or None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 async def _sweep(subnet: str) -> None:
     """Subnetz einmal anpingen, damit die ARP-Tabelle gefüllt ist (für MAC-Geräte)."""
     try:
@@ -87,12 +98,13 @@ class KaiScanner:
     """Zieht Scan-Ziele aus KAI, prüft Erreichbarkeit, meldet Status zurück."""
 
     def __init__(self, session: aiohttp.ClientSession, base: str, key: str,
-                 subnet: str | None, ports: list[int]) -> None:
+                 subnet: str | None, ports: list[int], discover: bool = True) -> None:
         self._session = session
         self._base = base.rstrip("/")
         self._key = key
         self._subnet = subnet
         self._ports = ports
+        self._discover = discover
 
     async def _targets(self) -> list[dict]:
         async with self._session.get(
@@ -122,11 +134,15 @@ class KaiScanner:
         if not targets:
             return
         need_arp = any(not t.get("ip") and t.get("macs") for t in targets)
-        if need_arp and self._subnet:
+        # Mit Subnetz wird gesweept, sobald MAC-Geräte zu prüfen sind ODER unbekannte Geräte
+        # entdeckt werden sollen (DHCP-Geräte für die Zuordnung im Asset Manager sichtbar machen).
+        do_arp = bool(self._subnet) and (need_arp or self._discover)
+        if do_arp:
             await _sweep(self._subnet)
-        arp = read_arp() if need_arp else {}
+        arp = read_arp() if do_arp else {}
 
         out: list[dict] = []
+        known_macs: set[str] = set()
         for t in targets:
             name = t.get("name")
             if not name:
@@ -140,8 +156,24 @@ class KaiScanner:
                     if _norm_mac(m) in arp:
                         online = True
                         break
+            for m in t.get("macs") or []:
+                n = _norm_mac(m)
+                if n:
+                    known_macs.add(n)
             out.append({"name": name, "entity": "network-scan", "domain": "network",
                         "status": "online" if online else "offline"})
+
+        # Unbekannte Geräte im Netz (per ARP gefunden, zu keinem Ziel gehörend) als „nicht
+        # zuordenbar" melden — mit MAC/IP/Hostname, damit sie im Asset Manager einem Asset
+        # zugeordnet werden können. Danach matcht der nächste Scan sie automatisch über die MAC.
+        if self._discover and arp:
+            for mac_n, ip in arp.items():
+                if mac_n in known_macs:
+                    continue
+                hostname = await _rdns(ip)
+                out.append({"name": hostname or ip, "entity": mac_n, "domain": "network",
+                            "status": "online", "mac": mac_n, "ip": ip, "hostname": hostname})
+
         if out:
             try:
                 await self._report(out)

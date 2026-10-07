@@ -22,6 +22,7 @@ from .const import (
     CONF_CONN_INTERVAL,
     CONF_HA_KEY,
     CONF_NMEA_PORT,
+    CONF_SCAN_DISCOVER,
     CONF_SCAN_PORTS,
     CONF_SCAN_SUBNET,
     CONF_HEADING,
@@ -330,7 +331,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     ha_key = (entry.data.get(CONF_HA_KEY) or "").strip()
     if ha_key:
         ports = [int(p) for p in str(entry.data.get(CONF_SCAN_PORTS, DEFAULT_SCAN_PORTS)).replace(" ", "").split(",") if p.isdigit()]
-        scanner = KaiScanner(session, entry.data[CONF_URL], ha_key, entry.data.get(CONF_SCAN_SUBNET) or None, ports)
+        discover = bool(entry.data.get(CONF_SCAN_DISCOVER, True))
+        scanner = KaiScanner(session, entry.data[CONF_URL], ha_key, entry.data.get(CONF_SCAN_SUBNET) or None, ports, discover)
         ci = max(10, int(entry.options.get(CONF_CONN_INTERVAL, DEFAULT_CONN_INTERVAL)))
         unsubs.append(async_track_time_interval(hass, scanner.run, timedelta(seconds=ci)))
         hass.async_create_task(scanner.run())

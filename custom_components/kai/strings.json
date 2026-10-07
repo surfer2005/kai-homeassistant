@@ -12,7 +12,8 @@
           "smartmeter_scan_interval": "Sende-Intervall Smartmeter (Sekunden)",
           "ha_key": "Asset-Konnektivität: Ingest-Key (optional, aktiviert den Netz-Scan)",
           "scan_subnet": "Scan-Subnetz für DHCP-Geräte (z. B. 192.168.1.0/24)",
-          "scan_ports": "TCP-Ports für Erreichbarkeits-Check (z. B. 80,443,22)"
+          "scan_ports": "TCP-Ports für Erreichbarkeits-Check (z. B. 80,443,22)",
+          "scan_discover": "Unbekannte Netz-Geräte melden (zum Zuordnen im Asset Manager)"
         }
       }
     },
