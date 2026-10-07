@@ -168,7 +168,7 @@ class KaiOptionsFlow(OptionsFlow):
     async def async_step_init(self, user_input=None) -> ConfigFlowResult:
         return self.async_show_menu(
             step_id="init",
-            menu_options=["add_ship", "remove_ship", "interval"],
+            menu_options=["add_ship", "edit_ship", "remove_ship", "interval"],
         )
 
     async def async_step_add_ship(self, user_input=None) -> ConfigFlowResult:
@@ -178,6 +178,31 @@ class KaiOptionsFlow(OptionsFlow):
             ships.append(ship)
             return self._save(ships=ships)
         return self.async_show_form(step_id="add_ship", data_schema=_ship_schema())
+
+    async def async_step_edit_ship(self, user_input=None) -> ConfigFlowResult:
+        ships = self._ships()
+        if not ships:
+            return self._save(ships=ships)
+        if user_input is not None:
+            self._edit_reg = user_input["ship"]
+            return await self.async_step_edit_ship_form()
+        regs = [s.get(CONF_REGISTRATION, "?") for s in ships]
+        schema = vol.Schema({
+            vol.Required("ship", default=regs[0]): selector.SelectSelector(
+                selector.SelectSelectorConfig(options=regs, mode=selector.SelectSelectorMode.DROPDOWN)),
+        })
+        return self.async_show_form(step_id="edit_ship", data_schema=schema)
+
+    async def async_step_edit_ship_form(self, user_input=None) -> ConfigFlowResult:
+        ships = self._ships()
+        idx = next((i for i, s in enumerate(ships) if s.get(CONF_REGISTRATION) == getattr(self, "_edit_reg", None)), None)
+        if idx is None:
+            return self._save(ships=ships)
+        if user_input is not None:
+            ship = {k: v for k, v in user_input.items() if v not in (None, "", [])}
+            ships[idx] = ship
+            return self._save(ships=ships)
+        return self.async_show_form(step_id="edit_ship_form", data_schema=_ship_schema(ships[idx]))
 
     async def async_step_remove_ship(self, user_input=None) -> ConfigFlowResult:
         ships = self._ships()

@@ -198,6 +198,9 @@ class KaiSender:
                     "name": (st.attributes.get("friendly_name") if st else None) or ent,
                     "unit": st.attributes.get("unit_of_measurement") if st else None,
                     "value": val,
+                    # Zulassungsnummer bei JEDEM Datenpunkt mitsenden (Zuordnung zum Schiff explizit,
+                    # nicht nur aus dem Sensornamen abgeleitet).
+                    "registration_number": ship.get(CONF_REGISTRATION),
                 })
         return out
 
@@ -335,7 +338,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if scan_key and subnet:
         ports = [int(p) for p in str(entry.data.get(CONF_SCAN_PORTS, DEFAULT_SCAN_PORTS)).replace(" ", "").split(",") if p.isdigit()]
         discover = bool(entry.data.get(CONF_SCAN_DISCOVER, True))
-        scanner = KaiScanner(session, entry.data[CONF_URL], scan_key, subnet, ports, discover)
+        _ships_cfg = entry.options.get(CONF_SHIPS, [])
+        scan_reg = (_ships_cfg[0].get(CONF_REGISTRATION) if _ships_cfg else None) or None
+        scanner = KaiScanner(session, entry.data[CONF_URL], scan_key, subnet, ports, discover, scan_reg)
         ci = max(10, int(entry.options.get(CONF_CONN_INTERVAL, DEFAULT_CONN_INTERVAL)))
         unsubs.append(async_track_time_interval(hass, scanner.run, timedelta(seconds=ci)))
         hass.async_create_task(scanner.run())

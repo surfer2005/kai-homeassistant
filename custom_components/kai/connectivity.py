@@ -123,13 +123,15 @@ class KaiScanner:
     """Zieht Scan-Ziele aus KAI, prüft Erreichbarkeit, meldet Status zurück."""
 
     def __init__(self, session: aiohttp.ClientSession, base: str, key: str,
-                 subnet: str | None, ports: list[int], discover: bool = True) -> None:
+                 subnet: str | None, ports: list[int], discover: bool = True,
+                 registration: str | None = None) -> None:
         self._session = session
         self._base = base.rstrip("/")
         self._key = key
         self._subnet = subnet
         self._ports = ports
         self._discover = discover
+        self._reg = registration
 
     async def _targets(self) -> list[dict]:
         async with self._session.get(
@@ -189,7 +191,8 @@ class KaiScanner:
                 if n:
                     known_macs.add(n)
             out.append({"name": name, "entity": "network-scan", "domain": "network",
-                        "status": "online" if online else "offline"})
+                        "status": "online" if online else "offline",
+                        "registration_number": self._reg})
 
         # Unbekannte Geräte im Netz (per ARP gefunden, zu keinem Ziel gehörend) als „nicht
         # zuordenbar" melden — mit MAC/IP/Hostname, damit sie im Asset Manager einem Asset
@@ -200,7 +203,8 @@ class KaiScanner:
                     continue
                 hostname = await _rdns(ip)
                 out.append({"name": hostname or ip, "entity": mac_n, "domain": "network",
-                            "status": "online", "mac": mac_n, "ip": ip, "hostname": hostname})
+                            "status": "online", "mac": mac_n, "ip": ip, "hostname": hostname,
+                            "registration_number": self._reg})
 
         entdeckt = sum(1 for o in out if o.get("entity") != "network-scan")
         _LOGGER.debug("KAI-Scan: %d Ziele aus KAI, %d ARP-Einträge, %d gemeldet (davon %d entdeckt)",
